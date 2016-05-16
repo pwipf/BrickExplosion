@@ -6,7 +6,7 @@
 
 QT       += opengl
 
-INCLUDEPATH += $$PWD/../include
+INCLUDEPATH += $$PWD/include
 
 
 CONFIG += console c++11
@@ -26,6 +26,4 @@ RESOURCES += \
 FORMS += \
     mainwindow.ui
 
-DISTFILES += \
-    test.bmp
 
