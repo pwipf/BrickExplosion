@@ -17,7 +17,8 @@
 
 ## Summary
 
-This is a Qt 5 program, [www.qt.io](https://www.qt.io/download-open-source/), written for a graphics course for learning openGL.  The code can easily be built and run with the QtCreator IDE that comes with Qt 5, or built with qmake and make, or mingw32-make, etc.  The simplest way to see the program work is probably to open the .pro file in QtCreator and run from there.  
+This is a C++ Qt 5 program, [www.qt.io](https://www.qt.io/download-open-source/), written for a graphics course for learning openGL  (Qt is a framework mainly for developing cross-platform applications with native-looking GUI). Qt has support for openGL, so in this case it takes the place of the GLEW and GLUT frameworks that many openGL tutorials use to take care of the windowing and loading openGL libraries.  For vector and matrix math the GLM library [(glm.g-truc.net)](http://glm.g-truc.net/) is used.  
+The code can easily be built and run with the QtCreator IDE that comes with Qt 5, or built with qmake and make, or mingw32-make, etc.  The simplest way to see the program work is probably to open the .pro file in QtCreator and run from there.  
 
 The program is not really optimized or meant to be a full-fledged game or anything like that, instead it is more an exploration of basic openGL concepts, with various geometry generation, texture application, lighting models, and animation effects thrown in.  
 
