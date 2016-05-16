@@ -1,0 +1,16 @@
+<RCC>
+    <qresource prefix="/">
+        <file>frag.glsl</file>
+        <file>grid_frag.glsl</file>
+        <file>grid_vert.glsl</file>
+        <file>vert_instanced.glsl</file>
+        <file>vert_uninstanced.glsl</file>
+        <file>frag_texture.glsl</file>
+        <file>vert_texture.glsl</file>
+        <file>frag_sky.glsl</file>
+        <file>vert_sky.glsl</file>
+        <file>grass.bmp</file>
+        <file>grasstex.bmp</file>
+        <file>wood.bmp</file>
+    </qresource>
+</RCC>
