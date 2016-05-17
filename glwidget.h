@@ -31,7 +31,6 @@ class GLWidget : public QOpenGLWidget, protected QOGLVER {
 
     public:
         GLWidget(QWidget *parent=0);
-        ~GLWidget();
 
     private slots:
         void onCheckLines(int b);
@@ -98,7 +97,7 @@ class GLWidget : public QOpenGLWidget, protected QOGLVER {
         void initAxes();
         void initializeGrid();
         glm::vec2 buildWall(float xs, float zs, float xf, float zf, int isStart, int isFinish, int startHeight, int height, int extMort);
-        void buildWallToPlan();
+        void buildHouse();
         void generateRing(Mesh &r, float inRad, float outRad);
         void generateGround();
         void generateFloor();
@@ -110,7 +109,7 @@ class GLWidget : public QOpenGLWidget, protected QOGLVER {
         void updateWallBuffers();
         void insertBrick(mat4 t);
         void updateLight();
-//        void updateView();
+
         void updateViewMat();
         void generateLight();
         void animateRing();
@@ -144,11 +143,12 @@ class GLWidget : public QOpenGLWidget, protected QOGLVER {
         void mouseMoveEvent(QMouseEvent *event);
         void keyPressEvent(QKeyEvent *event);
         void keyReleaseEvent(QKeyEvent *event);
-//        void timerEvent(QTimerEvent *);
+
         glm::vec2 w2dcSquare(const glm::vec2 &pt);
 
     private:
         GLuint loadShaders(const char* vertf, const char* fragf);
+        unsigned char* loadImg(const char * path, int &x, int &y);
         void initMeshes();
 
         GLuint programU,programI,programS,programT,programBox;

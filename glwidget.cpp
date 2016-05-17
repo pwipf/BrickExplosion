@@ -1,21 +1,48 @@
+/***************************************************************************************
+ *
+ * Copyright © Philip Wipf
+ * Please use this source code any way you like.
+ *
+ * (This software is designed to dynamically links to Qt which is
+ * licensed under the LGPL license.
+ * The source code for Qt SDK can be found at www.qt.io)
+ *
+ **************************************************************************************/
+
+// glwidget.cpp
+// This file has the main program logic, starting with the constructor for the GLWidget
+// class, which initializes some instance variables.
+//
+// The main functions are the initializeGL(), resizeGL(), and paintGL() callbacks which
+// are called at the appropriate times by the framework.
+//
+// Also included are the "slot" functions called when user interface controls are adjusted,
+// "onCheckLines()" is an example, which is called if the "Lines Only" checkbox is clicked.
+//
+// There are several functions which generate various geometries, called from the initializeGL()
+// function.
+//
+// The keyboard and mouse response are taken care of in the functions mouseMoveEvent(),
+// keyPressEvent(), etc.
+//
+// The animation is handled by the animate() function which is called by a timer on a regular
+// interval, 16ms.  The timer is started in the constructor.
+//
+// There are a few functions that are not used, like pointOnVirtualTrackball(), which were
+// waiting for more features or left over from old features.
+
+
 #include "glwidget.h"
-#include "mesh.h"
 
-#include <iostream>
-
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtc/random.hpp>
-#include <glm/glm.hpp>
+
 #include <QTextStream>
 #include <QColorDialog>
-#include <QDateTime>
 
+#include <iostream>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846f
-#endif
 
 using glm::inverse;
 using glm::vec2;
@@ -38,8 +65,9 @@ using glm::lookAt;
 using std::cout;
 using std::endl;
 using std::vector;
-unsigned char* loadImg(const char * path, int &x, int &y);
-static mat4 baseViewMatrix;
+
+
+// constructor for GLWidget class, which fills the main "widget" of the window.
 GLWidget::GLWidget(QWidget *parent) : QOpenGLWidget(parent) {
 
     mac=0;
@@ -102,8 +130,6 @@ GLWidget::GLWidget(QWidget *parent) : QOpenGLWidget(parent) {
     timerSpeed=16;
 
 
-
-
     mouseRateX=.002f;
     mouseRateY=.002f;
     moveSpeed=0.2f;
@@ -129,8 +155,8 @@ GLWidget::GLWidget(QWidget *parent) : QOpenGLWidget(parent) {
 
 }
 
-GLWidget::~GLWidget() {
-}
+// slots for various user interface controls, many non-existent, but there to help me
+// remember how to "do that type of control" again.
 void GLWidget::onChangeAlpha(int val){
     ring1.material.shinyness = val/10.0f;
     cout<<"alph "<<val/10.0f<<endl;
@@ -200,7 +226,7 @@ void GLWidget::onCheckNormals(int b){
 }
 void GLWidget::onCheckMortar(int b){
     renderMortar=b;
-    buildWallToPlan();
+    buildHouse();
 }
 void GLWidget::onCheckBrickFlat(int b){
     brickFlatShade=b;
@@ -220,25 +246,25 @@ void GLWidget::onChangeBrickWidth(double val){
     brickWidth=val;
     scaleBrick();
     brick.updateBuffers();
-    buildWallToPlan();
+    buildHouse();
 }
 void GLWidget::onChangeBrickDepth(double val){
     unScaleBrick();
     brickDepth=val;
     scaleBrick();
     brick.updateBuffers();
-    buildWallToPlan();
+    buildHouse();
 }
 void GLWidget::onChangeBrickHeight(double val){
     unScaleBrick();
     brickHeight=val;
     scaleBrick();
     brick.updateBuffers();
-    buildWallToPlan();
+    buildHouse();
 }
 void GLWidget::onChangeBrickSpace(double val){
     brickSpace=val;
-    buildWallToPlan();
+    buildHouse();
 }
 void GLWidget::onChangeBrickRough(double val){
     brickRough=val;
@@ -248,17 +274,20 @@ void GLWidget::onChangeBrickRough(double val){
 }
 void GLWidget::onChangeBricksPerRow(int val){
     bricksPerRow=val;
-    buildWallToPlan();
+    buildHouse();
 }
 void GLWidget::onChangeRows(int val){
     rows=val;
-    buildWallToPlan();
+    buildHouse();
 }
 void GLWidget::onChangeWallShape(int val){
     wallShape=(WallShape)val;
-    buildWallToPlan();
+    buildHouse();
 }
 
+
+// rebuildGeometry()
+// central function to call when rebuilding geometry after changes to bricks, etc.
 void GLWidget::rebuildGeometry(){
 
     rebuildBrick(brickColor);
@@ -282,11 +311,14 @@ void GLWidget::rebuildGeometry(){
 
     //    updateWallBuffers();
 
-     buildWallToPlan();
+     buildHouse();
     //if(checkNormals)
     //    rebuildNormalMarks(ring);
 }
 
+
+// geometry generation functions.
+// most (all?) objects are members of my Mesh class, which has built-in generation functions.
 
 void GLWidget::generateRing(Mesh &r, float inRad, float outRad){
     r.clearVertices();
@@ -307,6 +339,64 @@ void GLWidget::generateRing(Mesh &r, float inRad, float outRad){
 
 }
 
+// very manual method to create the ground which is just two triangles with texture coordinates
+// and normals.
+void GLWidget::generateGround(){
+    ground.clearVertices();
+
+    ground.addPt(vec3(10,0,10));
+    ground.addPt(vec3(10,0,-10));
+    ground.addPt(vec3(-10,0,-10));
+    ground.addPt(vec3(-10,0,10));
+    ground.addNorm(vec3(0,1,0));
+    ground.addNorm(vec3(0,1,0));
+    ground.addNorm(vec3(0,1,0));
+    ground.addNorm(vec3(0,1,0));
+    ground.addColor(vec3(0,.6f,0));
+    ground.addColor(vec3(0,.6f,0));
+    ground.addColor(vec3(0,.6f,0));
+    ground.addColor(vec3(0,.6f,0));
+    GLuint idx[]={0,1,3,3,1,2};
+    ground.addIdx(idx,6);
+    ground.addUV(vec2(0,500));
+    ground.addUV(vec2(0,0));
+    ground.addUV(vec2(500,0));
+    ground.addUV(vec2(500,500));
+    ground.scale(50,0);
+    ground.updateBuffers();
+
+    ground.material.specular=0;
+}
+
+// generate floor (and roof!)
+void GLWidget::generateFloor(){
+    floor.clearVertices();
+
+    floor.generateCube(.5f);
+    floor.computeNormals(1);
+    floor.scale(.5f,0);
+    floor.translate(vec3(0,.5f,0));
+    floor.scale(vec3(19,.1f,13),1);
+    floor.translate(vec3(3,0,0));
+    floor.updateBuffers();
+
+    //floor.modelMatrix=scale(mat4(),vec3(22,.1f,16));
+
+    floor.material.specular=.4f;
+
+    float height = rows*(brickHeight+brickSpace)+(brickHeight+brickSpace)/2;
+    roof.clearVertices();
+    roof.generateCube(.3f);
+    roof.computeNormals(1);
+    roof.scale(.5f,0);
+    roof.modelMatrix=translate(mat4(),vec3(3,height,0));
+    //roof.translate(vec3(0,height,0));
+    roof.scale(vec3(22,1,16),1);
+    //roof.translate(vec3(3,0,0));
+    roof.updateBuffers();
+    roof.material.specular=.5f;
+}
+
 void GLWidget::generateLight(){
     light.clearVertices();
     light.generateCube(lightColor,1);
@@ -319,7 +409,9 @@ void GLWidget::generateLight(){
 }
 
 
-void GLWidget::buildWallToPlan(){
+// build the house. calls the buildWall function for each section of wall, using the
+// return coordinate to start the next wall section.
+void GLWidget::buildHouse(){
 
     generateFloor();
     brick.clearInstances();
@@ -344,6 +436,19 @@ void GLWidget::buildWallToPlan(){
     fin = buildWall(fin.x,fin.y,22,fin.y,0,0,0,rows-5,0);
 }
 
+// buildWall takes various parameters to build a section of brick wall by adding instances
+// of bricks, and instances of mortar.
+// The return value is the point that the end of the wall ended up at, which is generally
+// different than the end point which was asked for, xf and zf.  The return value can then
+// be used for the start of the next wall section so that it will line up properly (or not
+// so properly)
+// xs, zs, xf, zf are the start and finish x and z coordinates of the wall section.
+// isStart and isFinish determine whether to put little half bricks in the offsets, to make
+// a straight (vertical) wall end, or leave the rows offset to join to the next section.
+// height is the number of rows of bricks to add.
+// startHeight is the row to start with, allowing wall sections that start above a door or window.
+// extMort is a flag to make the mortar inset at the bottom as well as the sides and top. A bit
+// of a hack.
 vec2 GLWidget::buildWall(float xs, float zs, float xf, float zf,
                          int isStart, int isFinish,int startHeight, int height, int extMort){
     int rows=height;
@@ -514,7 +619,8 @@ void GLWidget::rebuildBrick(vec3 col){
 }
 
 
-
+// at some point i rendered little lines showing the normals at vertices, for
+// troubleshooting/figureing-out.
 void GLWidget::rebuildNormalMarks(Mesh mesh){
     normalMarks.clearVertices();
     vector<vec3> pts,colors;
@@ -581,6 +687,8 @@ void GLWidget::updateLight(){
     glUniform1f(gattenLocT,gatten);
 }
 
+// axes not used, just makes a little object with green red and blue axes to let me know
+// which way is which, for troubleshooting/figureing-out.
 void GLWidget::initAxes(){
     vector<vec3>pts,colors;
     vec3 o(0,1,0);
@@ -610,60 +718,15 @@ void GLWidget::initAxes(){
 }
 
 
-void GLWidget::generateGround(){
-    ground.clearVertices();
-
-    ground.addPt(vec3(10,0,10));
-    ground.addPt(vec3(10,0,-10));
-    ground.addPt(vec3(-10,0,-10));
-    ground.addPt(vec3(-10,0,10));
-    ground.addNorm(vec3(0,1,0));
-    ground.addNorm(vec3(0,1,0));
-    ground.addNorm(vec3(0,1,0));
-    ground.addNorm(vec3(0,1,0));
-    ground.addColor(vec3(0,.6f,0));
-    ground.addColor(vec3(0,.6f,0));
-    ground.addColor(vec3(0,.6f,0));
-    ground.addColor(vec3(0,.6f,0));
-    GLuint idx[]={0,1,3,3,1,2};
-    ground.addIdx(idx,6);
-    ground.addUV(vec2(0,500));
-    ground.addUV(vec2(0,0));
-    ground.addUV(vec2(500,0));
-    ground.addUV(vec2(500,500));
-    ground.scale(50,0);
-    ground.updateBuffers();
-
-    ground.material.specular=0;
-}
-void GLWidget::generateFloor(){
-    floor.clearVertices();
-
-    floor.generateCube(.5f);
-    floor.computeNormals(1);
-    floor.scale(.5f,0);
-    floor.translate(vec3(0,.5f,0));
-    floor.scale(vec3(19,.1f,13),1);
-    floor.translate(vec3(3,0,0));
-    floor.updateBuffers();
-
-    //floor.modelMatrix=scale(mat4(),vec3(22,.1f,16));
-
-    floor.material.specular=.4f;
-
-    float height = rows*(brickHeight+brickSpace)+(brickHeight+brickSpace)/2;
-    roof.clearVertices();
-    roof.generateCube(.3f);
-    roof.computeNormals(1);
-    roof.scale(.5f,0);
-    roof.modelMatrix=translate(mat4(),vec3(3,height,0));
-    //roof.translate(vec3(0,height,0));
-    roof.scale(vec3(22,1,16),1);
-    //roof.translate(vec3(3,0,0));
-    roof.updateBuffers();
-    roof.material.specular=.5f;
-}
-
+// the main initialization function to initialize and generate the objects. Also loads shader
+// programs.
+//
+// The Mesh classes need a pointer to the openGL context, which is passed to each of them with
+// the .init() function.  The QOGLVER macro makes it a little easier to change the version
+// of openGL being used.
+//
+// The meshes are also .initialized() with shader programs and locations of various uniforms in
+// those programs.  It's probably an awful way to do this but is what I have done so far.
 void GLWidget::initMeshes() {
     brick.init((QOGLVER*)this);
     mortar.init((QOGLVER*)this);
@@ -827,84 +890,7 @@ void GLWidget::initMeshes() {
 
 
 
-void GLWidget::initSky(){
-    vec3 pts[] = {
-        // top
-        vec3(1,1,1),    // 0
-        vec3(1,1,-1),   // 1
-        vec3(-1,1,-1),  // 2
-        vec3(-1,1,1),   // 3
-
-        // bottom
-        vec3(1,-1,1),   // 4
-        vec3(-1,-1,1),  // 5
-        vec3(-1,-1,-1), // 6
-        vec3(1,-1,-1),  // 7
-
-        // front
-        vec3(1,1,1),    // 8
-        vec3(-1,1,1),   // 9
-        vec3(-1,-1,1),  // 10
-        vec3(1,-1,1),   // 11
-
-        // back
-        vec3(-1,-1,-1), // 12
-        vec3(-1,1,-1),  // 13
-        vec3(1,1,-1),   // 14
-        vec3(1,-1,-1),  // 15
-
-        // right
-        vec3(1,-1,1),   // 16
-        vec3(1,-1,-1),  // 17
-        vec3(1,1,-1),   // 18
-        vec3(1,1,1),     // 19
-
-        // left
-        vec3(-1,-1,1),  // 20
-        vec3(-1,1,1),   // 21
-        vec3(-1,1,-1),  // 22
-        vec3(-1,-1,-1) // 23
-
-    };
-    for(int i=0;i<24;i++)
-        pts[i].y+=0;
-
-    GLuint indices[] = {
-        0,3,2,1, restart,
-        4,7,6,5, restart,
-        8,11,10,9, restart,
-        12,15,14,13, restart,
-        16,19,18,17, restart,
-        20,23,22,21
-    };
-
-
-    glGenVertexArrays (1, &skyVao);
-    glBindVertexArray (skyVao);
-    GLuint positionBuffer;
-    glGenBuffers(1, &positionBuffer);
-    GLuint indexBuffer;
-    glGenBuffers(1, &indexBuffer);
-
-    glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(pts), pts, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-    GLuint program = loadShaders(":/vert_sky.glsl", ":/frag_sky.glsl");
-    glUseProgram(program);
-    programBox = program;
-    glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
-    GLint positionIndex = glGetAttribLocation(program, "position");
-    skyBrightLoc = glGetUniformLocation(program, "brightness");
-    glEnableVertexAttribArray(positionIndex);
-    glVertexAttribPointer(positionIndex, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-    rotMatLocBox=glGetUniformLocation(program,"rotation");
-
-    create_cube_map_1file(":/grass.bmp",&skyTex);
-
-}
-
+//the grid is not used.  This is left over from various labs and programs that used it.
 void GLWidget::initializeGrid() {
     vec3 pts[84];
     for(int i = -10; i <= 10; i++) {
@@ -926,91 +912,6 @@ void GLWidget::initializeGrid() {
     grid.updateBuffers();
 }
 
-void GLWidget::create_cube_map_1file(const char* boxbmp,
-                              GLuint* tex_cube){
-
-  // generate a cube-map texture to hold all the sides
-  glActiveTexture (GL_TEXTURE0);
-  glGenTextures (1, tex_cube);
-
-  //load each image and copy into a side of the cube-map texture
-  load_cube_map(*tex_cube, boxbmp);
-
-  // format cube map texture
-  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-}
-
-
-void getSubImage(uchar* sub, int sx,int sy, uchar* image, int posx, int posy){
-    int x=sx*4;
-
-    for(int j=sy*posy,sj=0; j<sy*(posy+1); j++,sj++){
-        for(int i=sx*posx,si=0; i<sx*(posx+1); i++,si++){
-            sub[(sj*sx+si)*3]=image[(j*x+i)*3];
-            sub[(sj*sx+si)*3+1]=image[(j*x+i)*3+1];
-            sub[(sj*sx+si)*3+2]=image[(j*x+i)*3+2];
-        }
-    }
-}
-
-bool GLWidget::load_cube_map(GLuint texture, const char* file_name){
-
-  glBindTexture (GL_TEXTURE_CUBE_MAP, texture);
-
-  int x, y;
-
-  uchar * image_data=loadImg(file_name,x,y);
-
-  if (!image_data) {
-    cout<<"ERROR: could not load "<<file_name<<"\n";
-    return false;
-  }
-
-  uint subx=x/4;
-  uint suby=y/3;
-  if(subx!=suby){
-      cout<<"not a skybox bmp"<<endl;
-      return false;
-  }
-
-  uchar* subimage[6];
-  for(uint i=0;i<6;i++){
-      subimage[i]=new uchar[subx*suby*3];
-
-  }
-
-  int xpos[]={0,2,1,1,1,3};
-  int ypos[]={1,1,2,0,1,1};
-
-  for(int pos=0;pos<6;pos++){
-      getSubImage(subimage[pos],subx,suby,image_data,xpos[pos],ypos[pos]);
-      uchar* temp=new uchar[subx*suby*3];
-      int size=subx*suby*3;
-      for(int i=0;i<size/3;i++){
-          temp[i*3]=subimage[pos][size-(i*3)];
-          temp[i*3+1]=subimage[pos][size-(i*3)+1];
-          temp[i*3+2]=subimage[pos][size-(i*3)+2];
-      }
-
-
-      glTexImage2D (GL_TEXTURE_CUBE_MAP_POSITIVE_X+pos,
-                    0, GL_RGB, subx,suby,0, GL_BGR,
-                    GL_UNSIGNED_BYTE,temp);
-
-      delete temp;
-  }
-
-  delete image_data;
-  for(int i=0;i<6;i++){
-      delete subimage[i];
-  }
-
-  return true;
-}
 
 void GLWidget::initializeGL() {
     initializeOpenGLFunctions();
@@ -1065,6 +966,7 @@ void GLWidget::resizeGL(int w, int h) {
 
 }
 
+// render the sky-box or cube-map whatever you call it
 void GLWidget::renderSky(){
     glDepthMask(GL_FALSE);
     glUseProgram(programBox);
@@ -1119,146 +1021,9 @@ void GLWidget::paintGL() {
     //axes.render();
 }
 
-GLuint GLWidget::loadShaders(const char* vertf, const char* fragf) {
-    GLuint program = glCreateProgram();
-    // read vertex shader from Qt resource file
-    QFile vertFile(vertf);
-    vertFile.open(QFile::ReadOnly | QFile::Text);
-    QString vertString;
-    QTextStream vertStream(&vertFile);
-    vertString.append(vertStream.readAll());
-    std::string vertSTLString = vertString.toStdString();
 
-    const GLchar* vertSource = vertSTLString.c_str();
-
-    GLuint vertShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertShader, 1, &vertSource, NULL);
-    glCompileShader(vertShader);
-    {
-        GLint compiled;
-        glGetShaderiv( vertShader, GL_COMPILE_STATUS, &compiled );
-        if ( !compiled ) {
-            GLsizei len;
-            glGetShaderiv( vertShader, GL_INFO_LOG_LENGTH, &len );
-
-            GLchar* log = new GLchar[len+1];
-            glGetShaderInfoLog( vertShader, len, &len, log );
-            std::cout << "Shader compilation failed: " << log << std::endl;
-            delete [] log;
-        }
-    }
-    glAttachShader(program, vertShader);
-    // read fragment shader from Qt resource file
-    QFile fragFile(fragf);
-    fragFile.open(QFile::ReadOnly | QFile::Text);
-    QString fragString;
-    QTextStream fragStream(&fragFile);
-    fragString.append(fragStream.readAll());
-    std::string fragSTLString = fragString.toStdString();
-
-    const GLchar* fragSource = fragSTLString.c_str();
-
-    GLuint fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragShader, 1, &fragSource, NULL);
-    glCompileShader(fragShader);
-    {
-        GLint compiled;
-        glGetShaderiv( fragShader, GL_COMPILE_STATUS, &compiled );
-        if ( !compiled ) {
-            GLsizei len;
-            glGetShaderiv( fragShader, GL_INFO_LOG_LENGTH, &len );
-
-            GLchar* log = new GLchar[len+1];
-            glGetShaderInfoLog( fragShader, len, &len, log );
-            std::cerr << "Shader compilation failed: " << log << std::endl;
-            delete [] log;
-        }
-    }
-    glAttachShader(program, fragShader);
-    glLinkProgram(program);
-    return program;
-}
-
-void GLWidget::mousePressEvent(QMouseEvent *event) {
-    if(ringArmed){
-        if(!finished){
-            ringArmed=0;
-            ringStart=1;
-        }else{
-            if(!finishedRebuild){
-                rebuildGeometry();
-                renderRoof=1;
-                renderMortar=1;
-                update();
-                finishedRebuild=1;
-                lightFollow=1;
-                lightColor=vec3(1,1,1);
-                updateLight();
-            }
-        }
-    }
-
-    vec2 pt(event->x(), event->y());
-    lastPt = pt;
-    setCursor(Qt::BlankCursor);
-//    mouseBegin=QCursor::pos();
-}
-void GLWidget::mouseReleaseEvent(QMouseEvent *) {
-    setCursor(Qt::ArrowCursor);
-//    QCursor::setPos(mouseBegin);
-}
-
-
-void GLWidget::mouseMoveEvent(QMouseEvent *event) {
-    vec2 pt(event->x(), event->y());
-    vec2 d = pt-lastPt;
-
-    angX-=d.x*mouseRateX;
-    angY-=d.y*mouseRateY;
-    if(angY>M_PI/2) angY=M_PI/2;
-    if(angY<-M_PI/2) angY=-M_PI/2;
-
-    matPitch=rotate(mat4(1.0f),angY,vec3(1,0,0));
-    matYaw=rotate(mat4(1.0f),angX,vec3(0,1,0));
-    matTrans=translate(mat4(1.0f),eyePos);
-
-    right = vec3(matYaw[0]);
-    forward = flyMode? vec3(-(matYaw*matPitch)[2]) : vec3(-matYaw[2]);
-
-    updateViewMat();
-    update();
-
-    lastPt = pt;
-
-}
-
-
-void GLWidget::updateViewMat(){
-    viewMatrix=inverse(matTrans*matYaw*matPitch);
-
-    glUseProgram(programI);
-    glUniformMatrix4fv(viewMatrixLocI, 1, false, value_ptr(viewMatrix));
-    glUniform3fv(lightLocI,1,value_ptr(vec3(viewMatrix*vec4(lightPosition,1))));
-
-    glUseProgram(programU);
-    glUniformMatrix4fv(viewMatrixLocU, 1, false, value_ptr(viewMatrix));
-    glUniform3fv(lightLocU,1,value_ptr(vec3(viewMatrix*vec4(lightPosition,1))));
-
-    glUseProgram(programS);
-    glUniformMatrix4fv(viewMatrixLocS, 1, false, value_ptr(viewMatrix));
-
-    glUseProgram(programT);
-    glUniformMatrix4fv(viewMatrixLocT, 1, false, value_ptr(viewMatrix));
-
-    mat4 rot = projMatrix*inverse(matYaw*matPitch);
-    glUseProgram(programBox);
-    glUniformMatrix4fv(rotMatLocBox, 1, false, value_ptr(rot));
-
-    updateLight();
-}
-
-
-
+// brickExplosion() called in animateRing when time to do the exploding (called each frame
+// of course)
 void GLWidget::brickExplosion(){
     renderMortar=0;
     //renderRoof=0;
@@ -1292,20 +1057,11 @@ void GLWidget::brickExplosion(){
 }
 
 
-float lengthXZ(vec3 v){
-    return glm::sqrt(v.x*v.x+v.z*v.z);
-}
-
-
-float f[3]={.01f,.02f,.04f};
-int fd[3]={1,1,1};
-int rising = 0;
-int once=1;
-
-
+// animateRing does the ring spinning (few lines at the end)
+// the rest with all the if statements is a sort of story-line that goes through
+// some stages to speed up the ring, suck the light, start glowing, get really bright,
+// explode the house, fade the brightness back to normal, etc.
 void GLWidget::animateRing(){
-
-
     if(!finished){
         if(ringStart){
             ringSpeed+=.001f;
@@ -1415,6 +1171,14 @@ void GLWidget::testForStart(){
     }
 }
 
+// length function but only in 2D (ignore the y coordinate)
+float lengthXZ(vec3 v){
+    return glm::sqrt(v.x*v.x+v.z*v.z);
+}
+
+// animate() calls the animateRing() function and then does the physics of the first-person
+// controls, complete with gravity and momentum, and friction which is different depending
+// if the person is on the ground or not (jumping).
 void GLWidget::animate(){
     animateRing();
     //temp force from keys
@@ -1508,7 +1272,87 @@ void GLWidget::animate(){
     update();
 }
 
+void GLWidget::mousePressEvent(QMouseEvent *event) {
+    if(ringArmed){
+        if(!finished){
+            ringArmed=0;
+            ringStart=1;
+        }else{
+            if(!finishedRebuild){
+                rebuildGeometry();
+                renderRoof=1;
+                renderMortar=1;
+                update();
+                finishedRebuild=1;
+                lightFollow=1;
+                lightColor=vec3(1,1,1);
+                updateLight();
+            }
+        }
+    }
 
+    vec2 pt(event->x(), event->y());
+    lastPt = pt;
+    setCursor(Qt::BlankCursor);
+//    mouseBegin=QCursor::pos();
+}
+void GLWidget::mouseReleaseEvent(QMouseEvent *) {
+    setCursor(Qt::ArrowCursor);
+//    QCursor::setPos(mouseBegin);
+}
+
+void GLWidget::mouseMoveEvent(QMouseEvent *event) {
+    vec2 pt(event->x(), event->y());
+    vec2 d = pt-lastPt;
+
+    angX-=d.x*mouseRateX;
+    angY-=d.y*mouseRateY;
+    if(angY>M_PI/2) angY=M_PI/2;
+    if(angY<-M_PI/2) angY=-M_PI/2;
+
+    matPitch=rotate(mat4(1.0f),angY,vec3(1,0,0));
+    matYaw=rotate(mat4(1.0f),angX,vec3(0,1,0));
+    matTrans=translate(mat4(1.0f),eyePos);
+
+    right = vec3(matYaw[0]);
+    forward = flyMode? vec3(-(matYaw*matPitch)[2]) : vec3(-matYaw[2]);
+
+    updateViewMat();
+    update();
+
+    lastPt = pt;
+
+}
+
+// updateViewMat() calculates the viewMatrix from the translation, yaw, and pitch
+// of the first-person, then "uploads" it to the shader programs.
+void GLWidget::updateViewMat(){
+    viewMatrix=inverse(matTrans*matYaw*matPitch);
+
+    glUseProgram(programI);
+    glUniformMatrix4fv(viewMatrixLocI, 1, false, value_ptr(viewMatrix));
+    glUniform3fv(lightLocI,1,value_ptr(vec3(viewMatrix*vec4(lightPosition,1))));
+
+    glUseProgram(programU);
+    glUniformMatrix4fv(viewMatrixLocU, 1, false, value_ptr(viewMatrix));
+    glUniform3fv(lightLocU,1,value_ptr(vec3(viewMatrix*vec4(lightPosition,1))));
+
+    glUseProgram(programS);
+    glUniformMatrix4fv(viewMatrixLocS, 1, false, value_ptr(viewMatrix));
+
+    glUseProgram(programT);
+    glUniformMatrix4fv(viewMatrixLocT, 1, false, value_ptr(viewMatrix));
+
+    // this is the sky-box or cube-map, needs to "rotate" along with view in order to
+    // stay stationary.
+    mat4 rot = projMatrix*inverse(matYaw*matPitch);
+    glUseProgram(programBox);
+    glUniformMatrix4fv(rotMatLocBox, 1, false, value_ptr(rot));
+
+    updateLight();
+}
+
+// keypress and keyrelease mainly use the "keys" variable which is a std::map.
 void GLWidget::keyReleaseEvent(QKeyEvent *event){
     if(event->isAutoRepeat())
         return;
@@ -1557,6 +1401,11 @@ void GLWidget::keyPressEvent(QKeyEvent *event){
 }
 
 
+// convert a 2d point, for example from a mouse click, to device coordinates.
+// the returned device coordinates have x in range -1 to 1, and y coordinates
+// also centered on 0 but with range set to have the same "scale" as the x coordinates.
+// (for example, using the virtual trackball function below, regardless what the window aspect
+// ratio has been resized to be, the x and y "sensitivity" when moving the mouse will be equal)
 vec2 GLWidget::w2dcSquare(const vec2 &pt){
     vec2 p;
     p.x=-1+pt.x*(2.0f/width);
@@ -1564,6 +1413,8 @@ vec2 GLWidget::w2dcSquare(const vec2 &pt){
     return p;
 }
 
+// this is used to make a trackball user interface, very useful for rotating
+// meshes with a mouse interface.
 vec3 GLWidget::pointOnVirtualTrackball(const vec2 &pt) {
     float r = .5f;
     float rr = r*r;
@@ -1584,7 +1435,166 @@ vec3 GLWidget::pointOnVirtualTrackball(const vec2 &pt) {
 }
 
 
-unsigned char* loadImg(const char * path, int &x, int &y){
+
+// initialization of cube-map sky-box.
+void GLWidget::initSky(){
+    vec3 pts[] = {
+        // top
+        vec3(1,1,1),    // 0
+        vec3(1,1,-1),   // 1
+        vec3(-1,1,-1),  // 2
+        vec3(-1,1,1),   // 3
+
+        // bottom
+        vec3(1,-1,1),   // 4
+        vec3(-1,-1,1),  // 5
+        vec3(-1,-1,-1), // 6
+        vec3(1,-1,-1),  // 7
+
+        // front
+        vec3(1,1,1),    // 8
+        vec3(-1,1,1),   // 9
+        vec3(-1,-1,1),  // 10
+        vec3(1,-1,1),   // 11
+
+        // back
+        vec3(-1,-1,-1), // 12
+        vec3(-1,1,-1),  // 13
+        vec3(1,1,-1),   // 14
+        vec3(1,-1,-1),  // 15
+
+        // right
+        vec3(1,-1,1),   // 16
+        vec3(1,-1,-1),  // 17
+        vec3(1,1,-1),   // 18
+        vec3(1,1,1),     // 19
+
+        // left
+        vec3(-1,-1,1),  // 20
+        vec3(-1,1,1),   // 21
+        vec3(-1,1,-1),  // 22
+        vec3(-1,-1,-1) // 23
+
+    };
+    for(int i=0;i<24;i++)
+        pts[i].y+=0;
+
+    GLuint indices[] = {
+        0,3,2,1, restart,
+        4,7,6,5, restart,
+        8,11,10,9, restart,
+        12,15,14,13, restart,
+        16,19,18,17, restart,
+        20,23,22,21
+    };
+
+
+    glGenVertexArrays (1, &skyVao);
+    glBindVertexArray (skyVao);
+    GLuint positionBuffer;
+    glGenBuffers(1, &positionBuffer);
+    GLuint indexBuffer;
+    glGenBuffers(1, &indexBuffer);
+
+    glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pts), pts, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    GLuint program = loadShaders(":/vert_sky.glsl", ":/frag_sky.glsl");
+    glUseProgram(program);
+    programBox = program;
+    glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
+    GLint positionIndex = glGetAttribLocation(program, "position");
+    skyBrightLoc = glGetUniformLocation(program, "brightness");
+    glEnableVertexAttribArray(positionIndex);
+    glVertexAttribPointer(positionIndex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    rotMatLocBox=glGetUniformLocation(program,"rotation");
+
+    create_cube_map_1file(":/grass.bmp",&skyTex);
+
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////
+//// loading textures functions
+
+// subImage() gets a subsection of image and puts it in sub.
+void getSubImage(uchar* sub, int sx,int sy, uchar* image, int posx, int posy){
+    int x=sx*4;
+
+    for(int j=sy*posy,sj=0; j<sy*(posy+1); j++,sj++){
+        for(int i=sx*posx,si=0; i<sx*(posx+1); i++,si++){
+            sub[(sj*sx+si)*3]=image[(j*x+i)*3];
+            sub[(sj*sx+si)*3+1]=image[(j*x+i)*3+1];
+            sub[(sj*sx+si)*3+2]=image[(j*x+i)*3+2];
+        }
+    }
+}
+
+// load the six faces of a cube-map texture with a single .bmp file that has all 6 faces
+// jammed into one.
+bool GLWidget::load_cube_map(GLuint texture, const char* file_name){
+
+  glBindTexture (GL_TEXTURE_CUBE_MAP, texture);
+
+  int x, y;
+
+  uchar * image_data=loadImg(file_name,x,y);
+
+  if (!image_data) {
+    cout<<"ERROR: could not load "<<file_name<<"\n";
+    return false;
+  }
+
+  uint subx=x/4;
+  uint suby=y/3;
+  if(subx!=suby){
+      cout<<"not a skybox bmp"<<endl;
+      return false;
+  }
+
+  uchar* subimage[6];
+  for(uint i=0;i<6;i++){
+      subimage[i]=new uchar[subx*suby*3];
+
+  }
+
+  int xpos[]={0,2,1,1,1,3};
+  int ypos[]={1,1,2,0,1,1};
+
+  for(int pos=0;pos<6;pos++){
+      getSubImage(subimage[pos],subx,suby,image_data,xpos[pos],ypos[pos]);
+      uchar* temp=new uchar[subx*suby*3];
+      int size=subx*suby*3;
+      for(int i=0;i<size/3;i++){
+          temp[i*3]=subimage[pos][size-(i*3)];
+          temp[i*3+1]=subimage[pos][size-(i*3)+1];
+          temp[i*3+2]=subimage[pos][size-(i*3)+2];
+      }
+
+
+      glTexImage2D (GL_TEXTURE_CUBE_MAP_POSITIVE_X+pos,
+                    0, GL_RGB, subx,suby,0, GL_BGR,
+                    GL_UNSIGNED_BYTE,temp);
+
+      delete temp;
+  }
+
+  delete image_data;
+  for(int i=0;i<6;i++){
+      delete subimage[i];
+  }
+
+  return true;
+}
+
+// open and load a 24-bit .bmp file. Returns the data as an array of uchars.
+// there are many libraries to do this but more trouble than it's worth to figure
+// out how to use the library, so I just made my own (very basic) function.
+// depending on what is commented out, it may or may not reverse the order of the lines
+// (.bmp files store the pixels sort of backwards compared to how you might expect and
+// how you want to use the data)
+unsigned char* GLWidget::loadImg(const char * path, int &x, int &y){
 
     char header[54]; // Each BMP file begins by a 54-bytes header
 
@@ -1650,7 +1660,85 @@ unsigned char* loadImg(const char * path, int &x, int &y){
 //    delete data;
 
     return data;
-    //delete data;
+}
+
+void GLWidget::create_cube_map_1file(const char* boxbmp,
+                              GLuint* tex_cube){
+
+  // generate a cube-map texture to hold all the sides
+  glActiveTexture (GL_TEXTURE0);
+  glGenTextures (1, tex_cube);
+
+  //load each image and copy into a side of the cube-map texture
+  load_cube_map(*tex_cube, boxbmp);
+
+  // format cube map texture
+  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri (GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
 
+// load a vertex and fragment shader from a file.
+// I did not write this but I truly can't remember where I found it.
+GLuint GLWidget::loadShaders(const char* vertf, const char* fragf) {
+    GLuint program = glCreateProgram();
+    // read vertex shader from Qt resource file
+    QFile vertFile(vertf);
+    vertFile.open(QFile::ReadOnly | QFile::Text);
+    QString vertString;
+    QTextStream vertStream(&vertFile);
+    vertString.append(vertStream.readAll());
+    std::string vertSTLString = vertString.toStdString();
+
+    const GLchar* vertSource = vertSTLString.c_str();
+
+    GLuint vertShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertShader, 1, &vertSource, NULL);
+    glCompileShader(vertShader);
+    {
+        GLint compiled;
+        glGetShaderiv( vertShader, GL_COMPILE_STATUS, &compiled );
+        if ( !compiled ) {
+            GLsizei len;
+            glGetShaderiv( vertShader, GL_INFO_LOG_LENGTH, &len );
+
+            GLchar* log = new GLchar[len+1];
+            glGetShaderInfoLog( vertShader, len, &len, log );
+            std::cout << "Shader compilation failed: " << log << std::endl;
+            delete [] log;
+        }
+    }
+    glAttachShader(program, vertShader);
+    // read fragment shader from Qt resource file
+    QFile fragFile(fragf);
+    fragFile.open(QFile::ReadOnly | QFile::Text);
+    QString fragString;
+    QTextStream fragStream(&fragFile);
+    fragString.append(fragStream.readAll());
+    std::string fragSTLString = fragString.toStdString();
+
+    const GLchar* fragSource = fragSTLString.c_str();
+
+    GLuint fragShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragShader, 1, &fragSource, NULL);
+    glCompileShader(fragShader);
+    {
+        GLint compiled;
+        glGetShaderiv( fragShader, GL_COMPILE_STATUS, &compiled );
+        if ( !compiled ) {
+            GLsizei len;
+            glGetShaderiv( fragShader, GL_INFO_LOG_LENGTH, &len );
+
+            GLchar* log = new GLchar[len+1];
+            glGetShaderInfoLog( fragShader, len, &len, log );
+            std::cerr << "Shader compilation failed: " << log << std::endl;
+            delete [] log;
+        }
+    }
+    glAttachShader(program, fragShader);
+    glLinkProgram(program);
+    return program;
+}
